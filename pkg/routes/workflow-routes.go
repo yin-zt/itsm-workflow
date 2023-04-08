@@ -1,9 +1,6 @@
 package routes
 
 import (
-	"github.com/eryajf/xirang/config"
-	"github.com/eryajf/xirang/public/common"
-
 	"github.com/gin-gonic/gin"
 )
 
