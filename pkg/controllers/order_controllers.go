@@ -21,3 +21,11 @@ func (m *OrderController) GetOrderInfo(c *gin.Context) {
 func (m *OrderController) CollectOrderInfo(c *gin.Context) {
 
 }
+
+// AddOrder 用于在数据库中增加一条工单记录
+func (m *OrderController) AddOrder(c *gin.Context) {
+	req := new(request.OrderAddReq)
+	Run(c, req, func() (interface{}, interface{}) {
+		return logic.Order.AddOrderRecord(c, req)
+	})
+}

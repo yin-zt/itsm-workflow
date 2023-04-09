@@ -7,10 +7,11 @@ import (
 
 // InitOrderRoutes 注册工单路由
 func InitOrderRoutes(r *gin.RouterGroup) gin.IRoutes {
-	base := r.Group("/order")
+	order := r.Group("/order")
 	{
-		base.GET("getorderinfo", controllers.Order.GetOrderInfo)
-		base.POST("collectorderinfo", controllers.Order.CollectOrderInfo)
+		order.GET("/getorderinfo", controllers.Order.GetOrderInfo)
+		order.POST("/collectorderinfo", controllers.Order.CollectOrderInfo)
+		order.POST("/add", controllers.Order.AddOrder)
 	}
 	return r
 }
