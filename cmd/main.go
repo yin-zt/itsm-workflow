@@ -15,7 +15,7 @@ import (
 
 func init() {
 	defer log.Flush()
-	for _, dir := range config.CONST_SYS_DIRS {
+	for _, dir := range config.ConstSysDirs {
 		os.Mkdir(dir, 0777)
 	}
 	log.ReplaceLogger(loger.GetLoggerOperate())

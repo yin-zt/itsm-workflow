@@ -9,10 +9,15 @@ import (
 
 type OrderController struct{}
 
-// GetPasswd 生成加密密码
-func (m *OrderController) GetPasswd(c *gin.Context) {
+// GetOrderInfo workflow获取工单详细数据
+func (m *OrderController) GetOrderInfo(c *gin.Context) {
 	req := new(request.GetOrderInfo)
 	Run(c, req, func() (interface{}, interface{}) {
 		return logic.Order.GetOrderInfo(c, req)
 	})
+}
+
+// CollectOrderInfo 用于收集cmdb-itsm推送的工单信息
+func (m *OrderController) CollectOrderInfo(c *gin.Context) {
+
 }

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	Base = &OrderController{}
+	Order = &OrderController{}
 
 	validate = validator.New()
 	trans    ut.Translator
