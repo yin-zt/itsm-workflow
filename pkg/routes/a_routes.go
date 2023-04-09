@@ -1,11 +1,14 @@
 package routes
 
 import (
+	log "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
+	"github.com/yin-zt/itsm-workflow/pkg/config"
 )
 
 // 初始化
 func InitRoutes() *gin.Engine {
+	defer log.Flush()
 	//设置模式
 	//gin.SetMode(config.Conf.System.Mode)
 
@@ -23,11 +26,11 @@ func InitRoutes() *gin.Engine {
 	//r.Use(middleware.OperationLogMiddleware())
 
 	// 路由分组
-	apiGroup := r.Group("/" + config.Conf.System.UrlPathPrefix)
+	apiGroup := r.Group("/" + config.UrlPathPrefix)
 
 	// 注册路由
 	InitBaseRoutes(apiGroup) // 注册基础路由, 不需要jwt认证中间件,不需要casbin中间件
 
-	//common.Log.Info("初始化路由完成！")
+	log.Info("初始化路由完成！")
 	return r
 }
