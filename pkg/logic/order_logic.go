@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
+	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
+	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
 )
 
 type OrderLogic struct{}
@@ -24,6 +26,19 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	if !ok {
 		return nil, ReqAssertErr
 	}
+
+	stepLists := r.StepList
+	instanceId := ""
+	for _, item := range stepLists {
+		if item.Status == "running" {
+			instanceId = item.InstanceId
+		}
+	}
+	orderId := fmt.Sprintf("%s%s", r.ProcessInstance.InstanceId, instanceId)
+	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
+		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
+	}
+
 	fmt.Println(r.FormData)
 	return nil, nil
 }
