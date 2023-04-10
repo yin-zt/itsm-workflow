@@ -6,9 +6,10 @@ import (
 
 type Order struct {
 	gorm.Model
-	GroupName string `gorm:"type:varchar(128);comment:'分组名称'" json:"groupName"`
-	Remark    string `gorm:"type:varchar(128);comment:'分组中文说明'" json:"remark"`
-	Creator   string `gorm:"type:varchar(20);comment:'创建人'" json:"creator"`
-	ParentId  uint   `gorm:"default:0;comment:'父组编号(编号为0时表示根组)'" json:"parentId"`
-	Source    string `gorm:"type:varchar(20);comment:'来源：dingTalk、weCom、ldap、platform'" json:"source"`
+	ApplyLogicId   string `gorm:"type:varchar(128);comment:'工单申请ID'" json:"apply_logic_id"`
+	ApplyUser      string `gorm:"type:varchar(128);comment:'工单申请用户'" json:"apply_user"`
+	ApplyStatus    string `gorm:"type:varchar(128);comment:'工单申请状态'" json:"apply_status"` // 0: 待审批, 60:审批通过， 20:审批拒绝
+	ApplyType      string `gorm:"type:varchar(128);comment:'工单申请类型'" json:"apply_type"`
+	ExecuteStatus  string `gorm:"type:varchar(128);comment:'工单执行状态'" json:"execute_status"`
+	DisplayContent string `gorm:"type:varchar(128);comment:'工单详情'" json:"display_content"`
 }

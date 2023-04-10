@@ -25,17 +25,6 @@ var (
 	 </formats>  
 </seelog>
 `
-	UrlPathPrefix  = "itsm-workflow"      // 接口调用前缀
-	ConstSysDirs   = []string{StorageDir} // 需要创建的目录
-	MysqlUsername  = "root"               // 连接mysql的用户
-	MysqlPassword  = ""
-	MysqlHost      = ""
-	MysqlPort      = 306
-	MysqlDatabase  = "itsm-workflow"
-	MysqlCharset   = "utf8mb4"                                  // 编码方式
-	MysqlCollation = "utf8mb4_general_ci"                       // 字符集(utf8mb4_general_ci速度比utf8mb4_unicode_ci快些)
-	MysqlQuery     = "parseTime=True&loc=Local&timeout=10000ms" //连接字符串参数
-	MysqlLogMode   = true                                       // 是否打印日志
 )
 
 const (

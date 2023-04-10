@@ -6,6 +6,7 @@ import (
 	log "github.com/cihub/seelog"
 	"github.com/yin-zt/itsm-workflow/pkg/config"
 	"github.com/yin-zt/itsm-workflow/pkg/routes"
+	"github.com/yin-zt/itsm-workflow/pkg/utils/common"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/loger"
 	"net/http"
 	"os"
@@ -24,6 +25,9 @@ func init() {
 
 func main() {
 	defer log.Flush()
+
+	common.InitMysql()
+
 	// 注册所有路由
 	r := routes.InitRoutes()
 

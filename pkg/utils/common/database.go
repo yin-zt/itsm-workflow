@@ -78,6 +78,6 @@ func InitMysql() {
 // 自动迁移表结构
 func dbAutoMigrate() {
 	_ = DB.AutoMigrate(
-		&order.Group{},
+		&order.Order{},
 	)
 }
