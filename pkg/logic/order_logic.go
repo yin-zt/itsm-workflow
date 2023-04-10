@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
@@ -38,6 +39,22 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
+
+	order := order.Order{
+		ParentId:  r.ParentId,
+		GroupName: r.GroupName,
+		Remark:    r.Remark,
+		Creator:   ctxUser.Username,
+		Source:    "platform", //默认是平台添加
+	}
+
+	// 然后在数据库中创建组
+	err := isql.Order.Add(&order)
+	if err != nil {
+		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
+	}
+
+	return nil, nil
 
 	fmt.Println(r.FormData)
 	return nil, nil
