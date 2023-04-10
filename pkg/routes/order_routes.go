@@ -10,8 +10,8 @@ func InitOrderRoutes(r *gin.RouterGroup) gin.IRoutes {
 	order := r.Group("/order")
 	{
 		order.GET("/getorderinfo", controllers.Order.GetOrderInfo)
-		order.POST("/collectorderinfo", controllers.Order.CollectOrderInfo)
-		order.POST("/add", controllers.Order.AddOrder)
+		order.POST("/collect", controllers.Order.CollectOrderInfo)
+		//order.POST("/add", controllers.Order.AddOrder)
 	}
 	return r
 }

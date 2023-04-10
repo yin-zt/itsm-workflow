@@ -19,13 +19,16 @@ func (m *OrderController) GetOrderInfo(c *gin.Context) {
 
 // CollectOrderInfo 用于收集cmdb-itsm推送的工单信息
 func (m *OrderController) CollectOrderInfo(c *gin.Context) {
-
+	req := new(request.OrderInfo)
+	Run(c, req, func() (interface{}, interface{}) {
+		return logic.Order.AnalyOrderInfo(c, req)
+	})
 }
 
 // AddOrder 用于在数据库中增加一条工单记录
-func (m *OrderController) AddOrder(c *gin.Context) {
-	req := new(request.OrderAddReq)
-	Run(c, req, func() (interface{}, interface{}) {
-		return logic.Order.AddOrderRecord(c, req)
-	})
-}
+//func (m *OrderController) AddOrder(c *gin.Context) {
+//	req := new(request.OrderAddReq)
+//	Run(c, req, func() (interface{}, interface{}) {
+//		return logic.Order.AddOrderRecord(c, req)
+//	})
+//}

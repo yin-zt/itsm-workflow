@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 )
@@ -16,6 +17,15 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 	_ = c
 
 	return r, nil
+}
+
+func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
+	r, ok := req.(*request.OrderInfo)
+	if !ok {
+		return nil, ReqAssertErr
+	}
+	fmt.Println(r.FormData)
+	return nil, nil
 }
 
 // AddOrderRecord 添加工单数据

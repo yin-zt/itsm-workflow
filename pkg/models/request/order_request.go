@@ -12,3 +12,26 @@ type OrderAddReq struct {
 	ParentId  uint   `json:"parentId" validate:"omitempty,min=0"`
 	Remark    string `json:"remark" validate:"min=0,max=100"` // 分组的中文描述
 }
+
+type OrderInfo struct {
+	ProcessInstance ProcessInstance `json:"processInstance" validate:"required"`
+	UserTaskInfo    []UserTaskInfo  `json:"userTaskInfo"`
+	StepList        []StepList      `json:"stepList"`
+	FormData        string          `json:"formData"`
+}
+
+type ProcessInstance struct {
+	InstanceId string `json:"instanceId" validate:"required"`
+	Name       string `json:"name" validate:"required"`
+	Category   string `json:"category" validate:"required"`
+	Creator    string `json:"creator" validate:"required"`
+}
+
+type UserTaskInfo struct {
+	Assignee []string `json:"assignee"`
+}
+
+type StepList struct {
+	InstanceId string `json:"instanceId"`
+	Status     string `json:"status"`
+}
