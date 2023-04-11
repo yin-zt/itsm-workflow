@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
@@ -60,12 +61,14 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	fmt.Println(r.UserTaskList[0].FormDefinition)
 	fmt.Println("mmmmmmmmmmmmmmmmm")
 
-	taskForm := r.UserTaskList
-	fmt.Println(taskForm)
-	fmt.Println(len(taskForm))
-	fmt.Printf("%T", taskForm)
-	fmt.Println(taskForm)
-	fmt.Println("kkkkkkkkkkkkkkkk")
+	taskForms := r.UserTaskList
+	for _, item := range taskForms {
+		var m2 []map[string]interface{}
+		fmt.Printf("%T", item.FormDefinition)
+		fmt.Println(item.FormDefinition)
+		json.Unmarshal([]byte(item.FormDefinition), &m2)
+
+	}
 
 	return nil, nil
 }
@@ -104,3 +107,14 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 //
 //	return nil, nil
 //}
+
+
+func (o OrderLogic) findOutLabelKeyVal(tasks []request.UserTask){
+	var 
+	for _, task := range tasks{
+		var m2 []map[string]interface{}
+		fmt.Printf("%T", item.FormDefinition)
+		fmt.Println(item.FormDefinition)
+		json.Unmarshal([]byte(item.FormDefinition), &m2)
+	}
+}
