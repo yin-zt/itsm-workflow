@@ -3,7 +3,6 @@ package logic
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
@@ -40,23 +39,34 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
 
-	order := order.Order{
-		ParentId:  r.ParentId,
-		GroupName: r.GroupName,
-		Remark:    r.Remark,
-		Creator:   ctxUser.Username,
-		Source:    "platform", //默认是平台添加
-	}
+	//order := order.Order{
+	//	ParentId:  r.ParentId,
+	//	GroupName: r.GroupName,
+	//	Remark:    r.Remark,
+	//	Creator:   ctxUser.Username,
+	//	Source:    "platform", //默认是平台添加
+	//}
 
 	// 然后在数据库中创建组
-	err := isql.Order.Add(&order)
-	if err != nil {
-		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
-	}
-
-	return nil, nil
+	//err := isql.Order.Add(&order)
+	//if err != nil {
+	//	return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
+	//}
 
 	fmt.Println(r.FormData)
+	fmt.Println("pppppppppppppp")
+	fmt.Println(r.UserTaskList)
+	fmt.Println("ooooooooooooooooooooo")
+	fmt.Println(r.UserTaskList[0].FormDefinition)
+	fmt.Println("mmmmmmmmmmmmmmmmm")
+
+	taskForm := r.UserTaskList
+	fmt.Println(taskForm)
+	fmt.Println(len(taskForm))
+	fmt.Printf("%T", taskForm)
+	fmt.Println(taskForm)
+	fmt.Println("kkkkkkkkkkkkkkkk")
+
 	return nil, nil
 }
 

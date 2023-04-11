@@ -18,6 +18,7 @@ type OrderInfo struct {
 	UserTaskInfo    []UserTaskInfo  `json:"userTaskInfo"`
 	StepList        []StepList      `json:"stepList"`
 	FormData        string          `json:"formData"`
+	UserTaskList    []UserTask      `json:"userTaskList"`
 }
 
 type ProcessInstance struct {
@@ -34,4 +35,9 @@ type UserTaskInfo struct {
 type StepList struct {
 	InstanceId string `json:"instanceId"`
 	Status     string `json:"status"`
+}
+
+type UserTask struct {
+	Type           string `json:"type"`
+	FormDefinition string `json:"formDefinition"`
 }
