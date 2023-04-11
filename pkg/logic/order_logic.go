@@ -3,6 +3,7 @@ package logic
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
@@ -62,13 +63,8 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	fmt.Println("mmmmmmmmmmmmmmmmm")
 
 	taskForms := r.UserTaskList
-	for _, item := range taskForms {
-		var m2 []map[string]interface{}
-		fmt.Printf("%T", item.FormDefinition)
-		fmt.Println(item.FormDefinition)
-		json.Unmarshal([]byte(item.FormDefinition), &m2)
-
-	}
+	res := o.FindOutLabelKeyVal(taskForms)
+	fmt.Println(res)
 
 	return nil, nil
 }
@@ -108,13 +104,44 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 //	return nil, nil
 //}
 
-
-func (o OrderLogic) findOutLabelKeyVal(tasks []request.UserTask){
-	var 
-	for _, task := range tasks{
+// FindOutLabelKeyVal 作用是解析工单任务中字段名称与字段id的关联关系，并以字典的形式返回。
+// 字典最外层的key是容器的id，里面的字典key为字段id，值为 字段的中文名
+func (o OrderLogic) FindOutLabelKeyVal(tasks []request.UserTask) map[string]map[string]string {
+	var retMap = map[string]map[string]string{}
+	for _, task := range tasks {
 		var m2 []map[string]interface{}
-		fmt.Printf("%T", item.FormDefinition)
-		fmt.Println(item.FormDefinition)
-		json.Unmarshal([]byte(item.FormDefinition), &m2)
+		json.Unmarshal([]byte(task.FormDefinition), &m2)
+		if len(m2) == 0 {
+			continue
+		}
+		for _, innerMap := range m2 {
+			var mapKey = ""
+			var bigMap = map[string]string{}
+			fmt.Println(123)
+			if labelName, ok := innerMap["key"]; ok {
+				mapKey = labelName.(string)
+				retMap[mapKey] = map[string]string{}
+			} else {
+				continue
+			}
+			fmt.Println(456)
+			if propertys, ok := innerMap["propertys"]; ok {
+				if propertysLists, ok := propertys.([]interface{}); ok {
+					for _, oneProperty := range propertysLists {
+						oneData := oneProperty.(map[string]interface{})
+						labelName := oneData["label"]
+						modelField := oneData["modelField"]
+						bigMap[modelField.(string)] = labelName.(string)
+					}
+					fmt.Println(567)
+				} else {
+					log.Error("propertys 竟然不是列表")
+				}
+			}
+			if mapKey != "" && bigMap != nil {
+				retMap[mapKey] = bigMap
+			}
+		}
 	}
+	return retMap
 }
