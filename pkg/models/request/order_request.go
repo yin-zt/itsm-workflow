@@ -15,26 +15,29 @@ type OrderAddReq struct {
 
 type OrderInfo struct {
 	ProcessInstance ProcessInstance `json:"processInstance" validate:"required"`
+	UserTaskList    []UserTask      `json:"userTaskList"`
 	UserTaskInfo    []UserTaskInfo  `json:"userTaskInfo"`
 	StepList        []StepList      `json:"stepList"`
-	FormData        string          `json:"formData"`
-	UserTaskList    []UserTask      `json:"userTaskList"`
 }
 
 type ProcessInstance struct {
 	InstanceId string `json:"instanceId" validate:"required"`
+	Status     string `json:"status" validate:"required"`
 	Name       string `json:"name" validate:"required"`
 	Category   string `json:"category" validate:"required"`
 	Creator    string `json:"creator" validate:"required"`
 }
 
 type UserTaskInfo struct {
-	Assignee []string `json:"assignee"`
+	Assignee   []string `json:"assignee"`
+	Status     string   `json:"status"`
+	UserTaskId string   `json:"userTaskId"`
 }
 
 type StepList struct {
 	InstanceId string `json:"instanceId"`
 	Status     string `json:"status"`
+	FormData   string `json:"formData"`
 }
 
 type UserTask struct {

@@ -24,19 +24,29 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 }
 
 func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
+	var (
+		taskId     string
+		instanceId string
+		formData   string
+	)
 	r, ok := req.(*request.OrderInfo)
 	if !ok {
 		return nil, ReqAssertErr
 	}
-
 	stepLists := r.StepList
-	instanceId := ""
 	for _, item := range stepLists {
 		if item.Status == "running" {
-			instanceId = item.InstanceId
+			taskId = item.InstanceId
+			formData = item.FormData
 		}
 	}
-	orderId := fmt.Sprintf("%s%s", r.ProcessInstance.InstanceId, instanceId)
+	instanceId = r.ProcessInstance.InstanceId
+	if r.ProcessInstance.Status != "running" {
+		log.Errorf("此工单状态为非流转,工单ID:%s, 任务ID:%s", instanceId, taskId)
+		return nil, nil
+	}
+	orderId := fmt.Sprintf("%s_%s", instanceId, taskId)
+	fmt.Println(orderId)
 	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
@@ -54,18 +64,9 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	//if err != nil {
 	//	return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
 	//}
-
-	fmt.Println(r.FormData)
-	fmt.Println("pppppppppppppp")
-	fmt.Println(r.UserTaskList)
-	fmt.Println("ooooooooooooooooooooo")
-	fmt.Println(r.UserTaskList[0].FormDefinition)
-	fmt.Println("mmmmmmmmmmmmmmmmm")
-
-	taskForms := r.UserTaskList
-	res := o.FindOutLabelKeyVal(taskForms)
-	fmt.Println(res)
-
+	res := o.FindOutLabelKeyVal(r.UserTaskList)
+	applyContent := o.MakeUpOrderContent(res, formData)
+	fmt.Println(applyContent)
 	return nil, nil
 }
 
@@ -110,21 +111,23 @@ func (o OrderLogic) FindOutLabelKeyVal(tasks []request.UserTask) map[string]map[
 	var retMap = map[string]map[string]string{}
 	for _, task := range tasks {
 		var m2 []map[string]interface{}
-		json.Unmarshal([]byte(task.FormDefinition), &m2)
+		err := json.Unmarshal([]byte(task.FormDefinition), &m2)
+		if err != nil {
+			log.Errorf("解析task.FormDefinition字符串内容失败，错误：%s", err)
+			return nil
+		}
 		if len(m2) == 0 {
 			continue
 		}
 		for _, innerMap := range m2 {
 			var mapKey = ""
 			var bigMap = map[string]string{}
-			fmt.Println(123)
 			if labelName, ok := innerMap["key"]; ok {
 				mapKey = labelName.(string)
 				retMap[mapKey] = map[string]string{}
 			} else {
 				continue
 			}
-			fmt.Println(456)
 			if propertys, ok := innerMap["propertys"]; ok {
 				if propertysLists, ok := propertys.([]interface{}); ok {
 					for _, oneProperty := range propertysLists {
@@ -133,7 +136,6 @@ func (o OrderLogic) FindOutLabelKeyVal(tasks []request.UserTask) map[string]map[
 						modelField := oneData["modelField"]
 						bigMap[modelField.(string)] = labelName.(string)
 					}
-					fmt.Println(567)
 				} else {
 					log.Error("propertys 竟然不是列表")
 				}
@@ -144,4 +146,36 @@ func (o OrderLogic) FindOutLabelKeyVal(tasks []request.UserTask) map[string]map[
 		}
 	}
 	return retMap
+}
+
+func (o OrderLogic) MakeUpOrderContent(kepMap map[string]map[string]string, formData string) map[string]string {
+	var m2 []map[string]interface{}
+	var retResult = map[string]string{}
+	err := json.Unmarshal([]byte(formData), &m2)
+	if err != nil {
+		log.Errorf("解析formData内容失败，报错为:%s", err)
+		return nil
+	}
+	for key, keyVals := range kepMap {
+		for _, oneFormVal := range m2 {
+			if _, ok := oneFormVal[key]; ok {
+				values := oneFormVal["values"]
+				if labelVals, ok := values.([]interface{}); ok {
+					for _, item := range labelVals {
+						itemVal := item.(map[string]string)
+						for labelKey, labelName := range keyVals {
+							if _, ok := retResult[labelName]; ok {
+								retResult[labelName] = retResult[labelName] + ";" + itemVal[labelKey]
+							} else {
+								retResult[labelName] = itemVal[labelKey]
+							}
+						}
+					}
+				} else {
+					log.Errorf("formData字符串中，values竟然不是列表，error:%s", ok)
+				}
+			}
+		}
+	}
+	return retResult
 }
