@@ -25,9 +25,10 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 
 func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
 	var (
-		taskId     string
-		instanceId string
-		formData   string
+		taskId      string
+		instanceId  string
+		labelKeyMap = make(map[string]map[string]string)
+		labelValMap = make(map[string][]map[string]interface{})
 	)
 	r, ok := req.(*request.OrderInfo)
 	if !ok {
@@ -37,7 +38,6 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	for _, item := range stepLists {
 		if item.Status == "running" {
 			taskId = item.InstanceId
-			formData = item.FormData
 		}
 	}
 	instanceId = r.ProcessInstance.InstanceId
@@ -46,11 +46,11 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		return nil, nil
 	}
 	orderId := fmt.Sprintf("%s_%s", instanceId, taskId)
+	formData := r.FormData
 	fmt.Println(orderId)
 	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
-
 	//order := order.Order{
 	//	ParentId:  r.ParentId,
 	//	GroupName: r.GroupName,
@@ -64,9 +64,10 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	//if err != nil {
 	//	return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
 	//}
-	res := o.FindOutLabelKeyVal(r.UserTaskList)
-	applyContent := o.MakeUpOrderContent(res, formData)
-	fmt.Println(applyContent)
+	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
+	fmt.Println(labelKeyMap)
+	o.FindOutLabelVals(formData, labelValMap)
+	fmt.Println(labelValMap)
 	return nil, nil
 }
 
@@ -105,20 +106,20 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 //	return nil, nil
 //}
 
-// FindOutLabelKeyVal 作用是解析工单任务中字段名称与字段id的关联关系，并以字典的形式返回。
+// FindOutLabelKeys 作用是解析工单任务中字段名称与字段id的关联关系，并以字典的形式返回。
 // 字典最外层的key是容器的id，里面的字典key为字段id，值为 字段的中文名
-func (o OrderLogic) FindOutLabelKeyVal(tasks []request.UserTask) map[string]map[string]string {
-	var retMap = map[string]map[string]string{}
+func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string]map[string]string) {
 	for _, task := range tasks {
 		var m2 []map[string]interface{}
 		err := json.Unmarshal([]byte(task.FormDefinition), &m2)
 		if err != nil {
 			log.Errorf("解析task.FormDefinition字符串内容失败，错误：%s", err)
-			return nil
+			return
 		}
 		if len(m2) == 0 {
 			continue
 		}
+
 		for _, innerMap := range m2 {
 			var mapKey = ""
 			var bigMap = map[string]string{}
@@ -145,37 +146,29 @@ func (o OrderLogic) FindOutLabelKeyVal(tasks []request.UserTask) map[string]map[
 			}
 		}
 	}
-	return retMap
 }
 
-func (o OrderLogic) MakeUpOrderContent(kepMap map[string]map[string]string, formData string) map[string]string {
-	var m2 []map[string]interface{}
-	var retResult = map[string]string{}
-	err := json.Unmarshal([]byte(formData), &m2)
+// FindOutLabelVals
+func (o OrderLogic) FindOutLabelVals(formData string, kepMap map[string][]map[string]interface{}) {
+	var m3 []map[string]interface{}
+	fmt.Println(formData)
+	err := json.Unmarshal([]byte(formData), &m3)
 	if err != nil {
 		log.Errorf("解析formData内容失败，报错为:%s", err)
-		return nil
+		return
 	}
-	for key, keyVals := range kepMap {
-		for _, oneFormVal := range m2 {
-			if _, ok := oneFormVal[key]; ok {
-				values := oneFormVal["values"]
-				if labelVals, ok := values.([]interface{}); ok {
-					for _, item := range labelVals {
-						itemVal := item.(map[string]string)
-						for labelKey, labelName := range keyVals {
-							if _, ok := retResult[labelName]; ok {
-								retResult[labelName] = retResult[labelName] + ";" + itemVal[labelKey]
-							} else {
-								retResult[labelName] = itemVal[labelKey]
-							}
-						}
-					}
-				} else {
-					log.Errorf("formData字符串中，values竟然不是列表，error:%s", ok)
-				}
-			}
+	for _, oneFormVal := range m3 {
+		var (
+			mapList = []map[string]interface{}{}
+		)
+		keyStrId := oneFormVal["key"]
+		keyValues := oneFormVal["values"]
+		keyValuesLists := keyValues.([]interface{})
+
+		for _, item := range keyValuesLists {
+			itemVal := item.(map[string]interface{})
+			mapList = append(mapList, itemVal)
 		}
+		kepMap[keyStrId.(string)] = mapList
 	}
-	return retResult
 }
