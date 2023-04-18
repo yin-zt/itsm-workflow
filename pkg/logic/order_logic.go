@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
+	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
@@ -35,6 +36,7 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	var (
 		taskId      string
 		instanceId  string
+		creator     string
 		labelKeyMap = make(map[string]map[string]string)
 		labelValMap = make(map[string][]map[string]interface{})
 	)
@@ -48,40 +50,52 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 			taskId = item.InstanceId
 		}
 	}
-	instanceId = r.ProcessInstance.InstanceId
+
 	if r.ProcessInstance.Status != "running" {
 		log.Errorf("此工单状态为非流转,工单ID:%s, 任务ID:%s", instanceId, taskId)
 		return nil, nil
 	}
+	instanceId = r.ProcessInstance.InstanceId
+	creator = r.ProcessInstance.Creator
+	orderType := r.ProcessInstance.Name
 	orderId := fmt.Sprintf("%s_%s", instanceId, taskId)
 	formData := r.FormData
 	fmt.Println(orderId)
 	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
-	//order := order.Order{
-	//	ParentId:  r.ParentId,
-	//	GroupName: r.GroupName,
-	//	Remark:    r.Remark,
-	//	Creator:   ctxUser.Username,
-	//	Source:    "platform", //默认是平台添加
-	//}
+	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
+	jsonKey, err := json.Marshal(labelKeyMap)
+	if err != nil {
+		OpeLoger.Infof("labelKeyMap 解析异常，值为：%v", labelKeyMap)
+		jsonKey = nil
+	}
+
+	o.FindOutLabelVals(formData, labelValMap)
+	jsonVal, err := json.Marshal(labelValMap)
+	if err != nil {
+		OpeLoger.Infof("labelValMap 解析异常，值为：%v", labelValMap)
+		jsonVal = nil
+	}
+
+	order := order.Order{
+		ApplyLogicId:   orderId,
+		InstanceId:     instanceId,
+		TaskId:         taskId,
+		ApplyUser:      creator,
+		ApplyType:      orderType,
+		ApplyStatus:    0,
+		ExecuteStatus:  0,
+		DisplayLabel:   string(jsonKey),
+		DisplayContent: string(jsonVal),
+	}
 
 	// 然后在数据库中创建组
-	//err := isql.Order.Add(&order)
-	//if err != nil {
-	//	return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
-	//}
-	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
-	fmt.Println(labelKeyMap)
-	jsonKey, _ := json.Marshal(labelKeyMap)
-	fmt.Println(jsonKey)
-	fmt.Println(string(jsonKey))
-
-	fmt.Println("aaaaaaaaaaaaaa")
-	o.FindOutLabelVals(formData, labelValMap)
-	fmt.Println(labelValMap)
-	fmt.Println("bbbbbbbbbbbbb")
+	err = isql.Order.Add(&order)
+	if err != nil {
+		OpeLoger.Infof("向MySQL创建工单失败, 报错信息为：%v", err)
+		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建工单失败"))
+	}
 	return nil, nil
 }
 
