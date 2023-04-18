@@ -24,6 +24,14 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 }
 
 func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
+	var resp any
+	defer func() {
+		if err := recover(); err != resp {
+			fmt.Println("捕获到了panic 产生的异常： ", err)
+			fmt.Println("捕获到panic的异常了，recover并没有恢复回来")
+			OpeLoger.Errorf("AnalyOrderInfo 捕获到panic异常，recover并没有恢复回来了，【err】为：%s", err)
+		}
+	}()
 	var (
 		taskId      string
 		instanceId  string
@@ -66,8 +74,14 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	//}
 	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
 	fmt.Println(labelKeyMap)
+	jsonKey, _ := json.Marshal(labelKeyMap)
+	fmt.Println(jsonKey)
+	fmt.Println(string(jsonKey))
+
+	fmt.Println("aaaaaaaaaaaaaa")
 	o.FindOutLabelVals(formData, labelValMap)
 	fmt.Println(labelValMap)
+	fmt.Println("bbbbbbbbbbbbb")
 	return nil, nil
 }
 
