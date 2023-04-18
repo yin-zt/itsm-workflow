@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
+	"github.com/yin-zt/itsm-workflow/pkg/models/response"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
 )
@@ -15,13 +16,41 @@ type OrderLogic struct{}
 
 // GetOrderInfo
 func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
+	var resp any
+	defer func() {
+		if err := recover(); err != resp {
+			fmt.Println("捕获到了panic 产生的异常： ", err)
+			fmt.Println("捕获到panic的异常了，recover并没有恢复回来")
+			OpeLoger.Errorf("GetOrderInfo 捕获到panic异常，recover并没有恢复回来了，【err】为：%s", err)
+		}
+	}()
 	r, ok := req.(*request.GetOrderInfo)
 	if !ok {
 		return nil, ReqAssertErr
 	}
 	_ = c
+	filter := tools.H{"apply_logic_id": r.LogicId}
 
-	return r, nil
+	if !isql.Order.Exist(filter) {
+		OpeLoger.Errorf("工单信息不存在，工单ID为：%v", r.LogicId)
+		return nil, tools.NewMySqlError(fmt.Errorf("工单信息不存在"))
+	}
+
+	oneOrder := new(order.Order)
+	err := isql.Order.Find(filter, oneOrder)
+	if err != nil {
+		OpeLoger.Error("获取工单详细信息失败: %s", err.Error())
+		return nil, tools.NewMySqlError(fmt.Errorf("获取工单详细信息失败: %s", err.Error()))
+	}
+	labelVal := oneOrder.DisplayLabel
+	contentVal := oneOrder.DisplayContent
+	fmt.Println(labelVal)
+	fmt.Println(contentVal)
+	return response.OneOrderInfo{
+		Title:    oneOrder.ApplyType,
+		Type:     "default",
+		IsExpand: true,
+	}, nil
 }
 
 func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {

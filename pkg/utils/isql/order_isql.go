@@ -81,7 +81,7 @@ func (s OrderService) Update(dataObj *order.Order) error {
 
 // Find 获取单个资源
 func (s OrderService) Find(filter map[string]interface{}, data *order.Order, args ...interface{}) error {
-	return common.DB.Where(filter, args).Preload("Users").First(&data).Error
+	return common.DB.Where(filter, args).First(&data).Error
 }
 
 // Exist 判断资源是否存在
@@ -94,10 +94,4 @@ func (s OrderService) Exist(filter map[string]interface{}) bool {
 // Delete 批量删除
 func (s OrderService) Delete(groups []*order.Order) error {
 	return common.DB.Debug().Select("Users").Unscoped().Delete(&groups).Error
-}
-
-// GetApisById 根据接口ID获取接口列表
-func (s OrderService) GetGroupByIds(ids []uint) (datas []*order.Order, err error) {
-	err = common.DB.Where("id IN (?)", ids).Preload("Users").Find(&datas).Error
-	return datas, err
 }
