@@ -8,8 +8,11 @@ import (
 	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 	"github.com/yin-zt/itsm-workflow/pkg/models/response"
+	"github.com/yin-zt/itsm-workflow/pkg/utils/cmdb"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/isql"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
+	"strconv"
+	"strings"
 )
 
 type OrderLogic struct{}
@@ -42,13 +45,11 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 		OpeLoger.Error("获取工单详细信息失败: %s", err.Error())
 		return nil, tools.NewMySqlError(fmt.Errorf("获取工单详细信息失败: %s", err.Error()))
 	}
-	labelVal := oneOrder.DisplayLabel
-	contentVal := oneOrder.DisplayContent
-	fmt.Println(labelVal)
-	fmt.Println(contentVal)
+	//displayStr := oneOrder.DisplayContent
 	return response.OneOrderInfo{
 		Title:    oneOrder.ApplyType,
 		Type:     "default",
+		Item:     []string{oneOrder.DisplayContent},
 		IsExpand: true,
 	}, nil
 }
@@ -89,23 +90,17 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	orderType := r.ProcessInstance.Name
 	orderId := fmt.Sprintf("%s_%s", instanceId, taskId)
 	formData := r.FormData
-	fmt.Println(orderId)
 	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
 	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
-	jsonKey, err := json.Marshal(labelKeyMap)
-	if err != nil {
-		OpeLoger.Infof("labelKeyMap 解析异常，值为：%v", labelKeyMap)
-		jsonKey = nil
-	}
-
 	o.FindOutLabelVals(formData, labelValMap)
-	jsonVal, err := json.Marshal(labelValMap)
-	if err != nil {
-		OpeLoger.Infof("labelValMap 解析异常，值为：%v", labelValMap)
-		jsonVal = nil
-	}
+
+	dispalyContent := o.MakeDisplayContent(labelKeyMap, labelValMap)
+	fmt.Println(labelValMap)
+	fmt.Println(labelKeyMap)
+	fmt.Println(dispalyContent)
+	fmt.Println("mmmmmmmmmmmmmmmmmmmmmmmmm")
 
 	order := order.Order{
 		ApplyLogicId:   orderId,
@@ -115,16 +110,82 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		ApplyType:      orderType,
 		ApplyStatus:    0,
 		ExecuteStatus:  0,
-		DisplayLabel:   string(jsonKey),
-		DisplayContent: string(jsonVal),
+		DisplayContent: dispalyContent,
 	}
 
 	// 然后在数据库中创建组
-	err = isql.Order.Add(&order)
+	err := isql.Order.Add(&order)
 	if err != nil {
 		OpeLoger.Infof("向MySQL创建工单失败, 报错信息为：%v", err)
 		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建工单失败"))
 	}
+	return nil, nil
+}
+
+func (o OrderLogic) OaCallBack(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
+	var resp any
+	defer func() {
+		if err := recover(); err != resp {
+			fmt.Println("捕获到了panic 产生的异常： ", err)
+			fmt.Println("捕获到panic的异常了，recover并没有恢复回来")
+			OpeLoger.Errorf("OaCallBack 捕获到panic异常，recover并没有恢复回来了，【err】为：%s", err)
+		}
+	}()
+
+	r, ok := req.(*request.OaCallB)
+	if !ok {
+		return nil, ReqAssertErr
+	}
+	orderLogicId := c.PostForm("logic_id")
+	orderFormCode := c.PostForm("code")
+	orderCode, err := strconv.Atoi(orderFormCode)
+	if err != nil {
+		OpeLoger.Errorf("code 竟然不是整数, %v", c.PostForm("code"))
+	}
+	filter := tools.H{"apply_logic_id": orderLogicId}
+	if !isql.Order.Exist(filter) {
+		OpeLoger.Errorf("工单不存在，工单id为：%v", r.LogicId)
+		return nil, tools.NewValidatorError(fmt.Errorf("工单不存在, 工单id为:%v", orderLogicId))
+	}
+
+	updateOrderInfo := order.Order{
+		ApplyLogicId:  orderLogicId,
+		ExecuteStatus: uint(orderCode),
+	}
+	err = isql.Order.Update(&updateOrderInfo)
+	if err != nil {
+		OpeLoger.Errorf("更新工单信息失败: %v", err)
+		return nil, tools.NewMySqlError(fmt.Errorf("更新工单信息失败：%v", err))
+	}
+	callItsmRes, opeflag := o.SubmitItsmWorkflow(orderLogicId, orderFormCode)
+	if opeflag {
+		updateItsmInfo := order.Order{
+			ApplyLogicId:  orderLogicId,
+			ItsmOperation: 1,
+			ItsmResult:    callItsmRes,
+		}
+		err = isql.Order.Update(&updateItsmInfo)
+		if err != nil {
+			OpeLoger.Errorf("调用itsm自动审批接口正常，更新工单信息失败: %v", err)
+			return nil, tools.NewMySqlError(fmt.Errorf("调用itsm自动审批接口正常，更新工单信息失败：%v", err))
+		} else {
+			OpeLoger.Info("调用itsm自动审批接口正常，成功更新工单信息")
+		}
+	} else {
+		updateItsmInfo := order.Order{
+			ApplyLogicId:  orderLogicId,
+			ItsmOperation: 2,
+			ItsmResult:    callItsmRes,
+		}
+		err = isql.Order.Update(&updateItsmInfo)
+		if err != nil {
+			OpeLoger.Errorf("调用itsm自动审批接口异常，更新工单信息失败: %v", err)
+			return nil, tools.NewMySqlError(fmt.Errorf("调用itsm自动审批接口异常，更新工单信息失败：%v", err))
+		} else {
+			OpeLoger.Info("调用itsm自动审批接口异常，成功更新工单信息")
+		}
+	}
+	//isql.Order.Update()
 	return nil, nil
 }
 
@@ -167,6 +228,9 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 // 字典最外层的key是容器的id，里面的字典key为字段id，值为 字段的中文名
 func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string]map[string]string) {
 	for _, task := range tasks {
+		if task.FormDefinition == "" {
+			continue
+		}
 		var m2 []map[string]interface{}
 		err := json.Unmarshal([]byte(task.FormDefinition), &m2)
 		if err != nil {
@@ -205,7 +269,7 @@ func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string
 	}
 }
 
-// FindOutLabelVals
+// FindOutLabelVals 作用是解析工单任务中用户填写的字段值与字段id的关联关系，并以字典形式返回
 func (o OrderLogic) FindOutLabelVals(formData string, kepMap map[string][]map[string]interface{}) {
 	var m3 []map[string]interface{}
 	fmt.Println(formData)
@@ -227,5 +291,92 @@ func (o OrderLogic) FindOutLabelVals(formData string, kepMap map[string][]map[st
 			mapList = append(mapList, itemVal)
 		}
 		kepMap[keyStrId.(string)] = mapList
+	}
+}
+
+// MakeDisplayContent 解析存在数据库中的字段id和字段值，并以字符串方式传回给oa详情接口
+func (o OrderLogic) MakeDisplayContent(lableM map[string]map[string]string, contentM map[string][]map[string]interface{}) string {
+	var resp any
+	defer func() {
+		if err := recover(); err != resp {
+			fmt.Println("捕获到了panic 产生的异常： ", err)
+			fmt.Println("捕获到panic的异常了，recover并没有恢复回来")
+			OpeLoger.Errorf("MakeDisplayContent 捕获到panic异常，recover并没有恢复回来了，【err】为：%s", err)
+		}
+	}()
+	var (
+		//lableM    = make(map[string]interface{})
+		//contentM  = make(map[string]interface{})
+		resultStr = ""
+	)
+	//err := json.Unmarshal([]byte(labels), &lableM)
+	//if err != nil {
+	//	OpeLoger.Errorf("MakeDisplayContent 反序列化labels字符串异常，[err]: %v", err)
+	//	return ""
+	//}
+	//err = json.Unmarshal([]byte(contents), &contentM)
+	//if err != nil {
+	//	OpeLoger.Errorf("MakeDisplayContent 反序列化labels字符串异常，[err]: %v", err)
+	//	return ""
+	//}
+	for key, valMap := range lableM {
+		contentLists, ok := contentM[key]
+		if !ok {
+			OpeLoger.Infof("此键: %v 并不存在于contentM字典: %v中", key, contentM)
+			continue
+		}
+		if len(contentLists) == 0 {
+			continue
+		}
+		for secKey, secValStr := range valMap {
+			for _, itemInter := range contentLists {
+				lableContent := itemInter[secKey]
+				switch lableContentVal := lableContent.(type) {
+				case string:
+					resultStr = resultStr + "," + secValStr + ":" + lableContentVal
+				case []string:
+					if len(lableContentVal) == 0 {
+						continue
+					}
+					listStr := strings.Join(lableContentVal, ";")
+					//resultStr = resultStr + "\"" + secValStr + "\"" + ":" + "\"" + listStr + "\"" + ","
+					resultStr = resultStr + "," + secValStr + ":" + listStr
+				case []interface{}:
+					var labelContent = ""
+					for _, oneObj := range lableContentVal {
+						oneObjVal, ok := oneObj.(map[string]interface{})
+						if !ok {
+							OpeLoger.Errorf("oneObj此变量并非字典，值为：%v", oneObj)
+							continue
+						}
+						ipVal := oneObjVal["ip"]
+						labelContent = labelContent + ";" + ipVal.(string)
+					}
+					resultStr = resultStr + "," + secValStr + ":" + strings.Trim(labelContent, ";")
+				}
+			}
+		}
+	}
+	return strings.Trim(resultStr, ",")
+}
+
+func (o OrderLogic) SubmitItsmWorkflow(taskID, operateCode string) (string, bool) {
+	var (
+		tastinfos []string
+	)
+	tastinfos = strings.Split(taskID, "_")
+	fmt.Println(tastinfos[0])
+	fmt.Println(tastinfos[1])
+
+	if operateCode == "20" {
+		result, flag := cmdb.Cmdb.CloseItsmOrder(tastinfos[0], tastinfos[1])
+		return result, flag
+	} else if operateCode == "60" {
+		result, flag := cmdb.Cmdb.AutoShenpi(tastinfos[0], tastinfos[1])
+		fmt.Println(result, flag)
+		return result, flag
+	} else {
+		OpeLoger.Errorf("operateCode 的值不是20或者60，而是错误的数值：%v", operateCode)
+		return "", false
 	}
 }

@@ -2,6 +2,7 @@ package isql
 
 import (
 	"errors"
+	"fmt"
 	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/common"
 	"gorm.io/gorm"
@@ -76,7 +77,7 @@ func (s OrderService) Add(data *order.Order) error {
 
 // Update 更新资源
 func (s OrderService) Update(dataObj *order.Order) error {
-	return common.DB.Model(dataObj).Where("id = ?", dataObj.ID).Updates(dataObj).Error
+	return common.DB.Model(dataObj).Where("apply_logic_id = ?", dataObj.ApplyLogicId).Updates(dataObj).Error
 }
 
 // Find 获取单个资源
@@ -88,6 +89,8 @@ func (s OrderService) Find(filter map[string]interface{}, data *order.Order, arg
 func (s OrderService) Exist(filter map[string]interface{}) bool {
 	var dataObj order.Order
 	err := common.DB.Debug().Order("created_at DESC").Where(filter).First(&dataObj).Error
+	fmt.Println(err)
+	fmt.Println("oooooooooooo")
 	return !errors.Is(err, gorm.ErrRecordNotFound)
 }
 

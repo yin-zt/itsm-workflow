@@ -13,6 +13,15 @@ type OrderAddReq struct {
 	Remark    string `json:"remark" validate:"min=0,max=100"` // 分组的中文描述
 }
 
+// OA系统回调推送数据
+type OaCallB struct {
+	LogicId        string `json:"logic_id"`         // 业务id
+	Type           string `json:"type"`             // 审批类型
+	Code           uint   `json:"code"`             // 60审批通过，20审批驳回
+	AprCurrentName string `json:"apr_current_name"` // 审批人
+	AprCurrentMid  uint   `json:"apr_current_mid"`  // 审批人min
+}
+
 type OrderInfo struct {
 	ProcessInstance ProcessInstance `json:"processInstance" validate:"required"`
 	UserTaskList    []UserTask      `json:"userTaskList"`

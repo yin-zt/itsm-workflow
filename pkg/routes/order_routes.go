@@ -11,6 +11,7 @@ func InitOrderRoutes(r *gin.RouterGroup) gin.IRoutes {
 	{
 		order.GET("/getorderinfo", controllers.Order.GetOrderInfo)
 		order.POST("/collect", controllers.Order.CollectOrderInfo)
+		order.POST("/callback", controllers.Order.OaCallBack)
 		//order.POST("/add", controllers.Order.AddOrder)
 	}
 	return r
