@@ -341,6 +341,7 @@ func (o OrderLogic) MakeDisplayContent(lableM map[string]map[string]string, cont
 					listStr := strings.Join(lableContentVal, ";")
 					//resultStr = resultStr + "\"" + secValStr + "\"" + ":" + "\"" + listStr + "\"" + ","
 					resultStr = resultStr + "," + secValStr + ":" + listStr
+
 				case []interface{}:
 					var labelContent = ""
 					for _, oneObj := range lableContentVal {
