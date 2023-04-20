@@ -2,7 +2,6 @@ package isql
 
 import (
 	"errors"
-	"fmt"
 	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/common"
 	"gorm.io/gorm"
@@ -89,8 +88,6 @@ func (s OrderService) Find(filter map[string]interface{}, data *order.Order, arg
 func (s OrderService) Exist(filter map[string]interface{}) bool {
 	var dataObj order.Order
 	err := common.DB.Debug().Order("created_at DESC").Where(filter).First(&dataObj).Error
-	fmt.Println(err)
-	fmt.Println("oooooooooooo")
 	return !errors.Is(err, gorm.ErrRecordNotFound)
 }
 

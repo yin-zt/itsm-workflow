@@ -97,10 +97,6 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	o.FindOutLabelVals(formData, labelValMap)
 
 	dispalyContent := o.MakeDisplayContent(labelKeyMap, labelValMap)
-	fmt.Println(labelValMap)
-	fmt.Println(labelKeyMap)
-	fmt.Println(dispalyContent)
-	fmt.Println("mmmmmmmmmmmmmmmmmmmmmmmmm")
 
 	order := order.Order{
 		ApplyLogicId:   orderId,

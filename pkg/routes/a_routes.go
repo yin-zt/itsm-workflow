@@ -30,7 +30,7 @@ func InitRoutes() *gin.Engine {
 	r.Use(middleware.CORSMiddleware())
 
 	// 初始化JWT认证中间件
-	authMiddleware, err := middleware.InitAuth()
+	//authMiddleware, err := middleware.InitAuth()
 
 	// 路由分组
 	apiGroup := r.Group("/" + config.UrlPathPrefix)

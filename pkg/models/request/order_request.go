@@ -31,11 +31,11 @@ type OrderInfo struct {
 }
 
 type ProcessInstance struct {
-	InstanceId string `json:"instanceId" validate:"required"`
-	Status     string `json:"status" validate:"required"`
-	Name       string `json:"name" validate:"required"`
-	Category   string `json:"category" validate:"required"`
-	Creator    string `json:"creator" validate:"required"`
+	InstanceId string `json:"instanceId"`
+	Status     string `json:"status"`
+	Name       string `json:"name"`
+	Category   string `json:"category"`
+	Creator    string `json:"creator"`
 }
 
 type UserTaskInfo struct {
