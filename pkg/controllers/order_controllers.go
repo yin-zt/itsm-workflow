@@ -12,7 +12,7 @@ type OrderController struct{}
 // GetOrderInfo workflow获取工单详细数据
 func (m *OrderController) GetOrderInfo(c *gin.Context) {
 	req := new(request.GetOrderInfo)
-	Run(c, req, func() (interface{}, interface{}) {
+	RunOnce(c, req, func() (interface{}, interface{}) {
 		return logic.Order.GetOrderInfo(c, req)
 	})
 }

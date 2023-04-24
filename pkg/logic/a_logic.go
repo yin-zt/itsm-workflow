@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yin-zt/itsm-workflow/pkg/config"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/loger"
+	"github.com/yin-zt/itsm-workflow/pkg/utils/oa"
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
 )
 
@@ -13,4 +14,5 @@ var (
 	Order    = &OrderLogic{}
 	Cmdb     = NewEasyapi(config.CmdbHost, config.CmdbAk, config.CmdbSk)
 	OpeLoger = loger.GetLoggerOperate()
+	Oa       = &oa.ApproValApi{}
 )

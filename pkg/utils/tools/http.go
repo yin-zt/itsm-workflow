@@ -84,6 +84,11 @@ func Success(c *gin.Context, data interface{}) {
 	})
 }
 
+// SuccessOnce http 成功 用于返回工单详情特定数据结构
+func SuccessOnce(c *gin.Context, data interface{}) {
+	c.JSON(http.StatusOK, data)
+}
+
 // Err http 错误
 func Err(c *gin.Context, err *RspError, data interface{}) {
 	c.JSON(http.StatusOK, gin.H{

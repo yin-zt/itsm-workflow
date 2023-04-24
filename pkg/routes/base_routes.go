@@ -9,7 +9,10 @@ import (
 func InitBaseRoutes(r *gin.RouterGroup) gin.IRoutes {
 	base := r.Group("/base")
 	{
-		base.GET("ping", controllers.Demo)
+		base.GET("/ping", controllers.Demo)
+		base.GET("/userinfo", controllers.Oa)
+		base.GET("/userdepart", controllers.Department)
+		base.GET("/gm", controllers.Gm)
 	}
 	return r
 }

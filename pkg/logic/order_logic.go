@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
+	"github.com/yin-zt/itsm-workflow/pkg/config"
 	"github.com/yin-zt/itsm-workflow/pkg/models/order"
 	"github.com/yin-zt/itsm-workflow/pkg/models/request"
 	"github.com/yin-zt/itsm-workflow/pkg/models/response"
@@ -46,12 +47,21 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 		return nil, tools.NewMySqlError(fmt.Errorf("获取工单详细信息失败: %s", err.Error()))
 	}
 	//displayStr := oneOrder.DisplayContent
-	return response.OneOrderInfo{
+
+	disPlayContent := strings.Split(oneOrder.DisplayContent, "$$$")
+
+	responseItem := response.OneOrderInfo{
 		Title:    oneOrder.ApplyType,
 		Type:     "default",
-		Item:     []string{oneOrder.DisplayContent},
+		Item:     disPlayContent,
 		IsExpand: true,
-	}, nil
+	}
+	response := map[string]interface{}{
+		"result":      float64(0),
+		"res_info":    "ok",
+		"result_rows": []response.OneOrderInfo{responseItem},
+	}
+	return response, nil
 }
 
 func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
@@ -87,12 +97,14 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	}
 	instanceId = r.ProcessInstance.InstanceId
 	creator = r.ProcessInstance.Creator
-	orderType := r.ProcessInstance.Name
+	orderName := r.ProcessInstance.Name
 	orderId := fmt.Sprintf("%s_%s", instanceId, taskId)
 	formData := r.FormData
 	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
+	approvalFlow := o.FindOutWorkflow(r.UserTaskList)
+	fmt.Println(approvalFlow)
 	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
 	o.FindOutLabelVals(formData, labelValMap)
 
@@ -103,10 +115,12 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		InstanceId:     instanceId,
 		TaskId:         taskId,
 		ApplyUser:      creator,
-		ApplyType:      orderType,
+		ApplyType:      config.ItsmType,
+		OrderName:      orderName,
 		ApplyStatus:    0,
 		ExecuteStatus:  0,
 		DisplayContent: dispalyContent,
+		ApprovalUser:   approvalFlow,
 	}
 
 	// 然后在数据库中创建组
@@ -115,6 +129,9 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		OpeLoger.Infof("向MySQL创建工单失败, 报错信息为：%v", err)
 		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建工单失败"))
 	}
+
+	// OriginApproval(logicId, orderName, userinfos, creator string)
+	Oa.OriginApproval(orderId, orderName, approvalFlow, creator)
 	return nil, nil
 }
 
@@ -185,40 +202,66 @@ func (o OrderLogic) OaCallBack(c *gin.Context, req interface{}) (data interface{
 	return nil, nil
 }
 
-// AddOrderRecord 添加工单数据
-//func (o OrderLogic) AddOrderRecord(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
-//	r, ok := req.(*request.OrderAddReq)
-//	if !ok {
-//		return nil, ReqAssertErr
-//	}
-//	_ = c
-//
-//	if isql.Order.Exist(tools.H{"order_name": r.OrderName}) {
-//		return nil, tools.NewValidatorError(fmt.Errorf("该工单对应工单ID已存在"))
-//	}
-//
-//	// 获取当前用户
-//	ctxUser, err := isql.User.GetCurrentLoginUser(c)
-//	if err != nil {
-//		return nil, tools.NewMySqlError(fmt.Errorf("获取当前登陆用户信息失败"))
-//	}
-//
-//	group := model.Group{
-//		ParentId:  r.ParentId,
-//		GroupName: r.GroupName,
-//		Remark:    r.Remark,
-//		Creator:   ctxUser.Username,
-//		Source:    "platform", //默认是平台添加
-//	}
-//
-//	// 然后在数据库中创建组
-//	err = isql.Group.Add(&group)
-//	if err != nil {
-//		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建分组失败"))
-//	}
-//
-//	return nil, nil
-//}
+// FindOutWorkflow 作用是解析itsm流程中首节点的内容，找出相应的审批流
+func (o OrderLogic) FindOutWorkflow(tasks []request.UserTask) string {
+	for _, task := range tasks {
+		if task.FormDefinition == "" {
+			continue
+		}
+		var m2 []map[string]interface{}
+		err := json.Unmarshal([]byte(task.FormDefinition), &m2)
+		if err != nil {
+			log.Errorf("解析task.FormDefinition字符串内容失败，错误：%s", err)
+			return ""
+		}
+		if len(m2) == 0 {
+			continue
+		}
+
+		for _, innerMap := range m2 {
+			fmt.Println(innerMap["name"])
+			fmt.Println(innerMap["displayCondition"])
+			if innerMap["displayCondition"] == nil {
+				fmt.Println(innerMap["displayCondition"])
+				continue
+			}
+			if propertys, ok := innerMap["propertys"]; ok {
+				if propertysLists, ok := propertys.([]interface{}); ok {
+					for _, oneProperty := range propertysLists {
+						oneData, ok := oneProperty.(map[string]interface{})
+						if !ok {
+							OpeLoger.Error("property列表中元素竟然不是字典")
+						}
+						modelField := oneData["modelField"]
+						modelFieldStr, ok := modelField.(string)
+						if !ok {
+							OpeLoger.Error("modelField不是字符串")
+							return ""
+						}
+						if modelFieldStr == "approval_flow" {
+							options := oneData["options"]
+							optionsMap, ok := options.(map[string]interface{})
+							if !ok {
+								OpeLoger.Error("options 竟然不是字典")
+								continue
+							}
+							defaultVal, ok := optionsMap["defaultValue"]
+							if ok {
+								return defaultVal.(string)
+							} else {
+								return ""
+							}
+
+						}
+					}
+				} else {
+					OpeLoger.Error("FindOutWorkflow propertys 竟然不是列表")
+				}
+			}
+		}
+	}
+	return ""
+}
 
 // FindOutLabelKeys 作用是解析工单任务中字段名称与字段id的关联关系，并以字典的形式返回。
 // 字典最外层的key是容器的id，里面的字典key为字段id，值为 字段的中文名
@@ -268,7 +311,7 @@ func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string
 // FindOutLabelVals 作用是解析工单任务中用户填写的字段值与字段id的关联关系，并以字典形式返回
 func (o OrderLogic) FindOutLabelVals(formData string, kepMap map[string][]map[string]interface{}) {
 	var m3 []map[string]interface{}
-	fmt.Println(formData)
+	//fmt.Println(formData)
 	err := json.Unmarshal([]byte(formData), &m3)
 	if err != nil {
 		log.Errorf("解析formData内容失败，报错为:%s", err)
@@ -305,16 +348,7 @@ func (o OrderLogic) MakeDisplayContent(lableM map[string]map[string]string, cont
 		//contentM  = make(map[string]interface{})
 		resultStr = ""
 	)
-	//err := json.Unmarshal([]byte(labels), &lableM)
-	//if err != nil {
-	//	OpeLoger.Errorf("MakeDisplayContent 反序列化labels字符串异常，[err]: %v", err)
-	//	return ""
-	//}
-	//err = json.Unmarshal([]byte(contents), &contentM)
-	//if err != nil {
-	//	OpeLoger.Errorf("MakeDisplayContent 反序列化labels字符串异常，[err]: %v", err)
-	//	return ""
-	//}
+
 	for key, valMap := range lableM {
 		contentLists, ok := contentM[key]
 		if !ok {
@@ -329,14 +363,14 @@ func (o OrderLogic) MakeDisplayContent(lableM map[string]map[string]string, cont
 				lableContent := itemInter[secKey]
 				switch lableContentVal := lableContent.(type) {
 				case string:
-					resultStr = resultStr + "," + secValStr + ":" + lableContentVal
+					resultStr = resultStr + "$$$" + secValStr + ":" + lableContentVal
 				case []string:
 					if len(lableContentVal) == 0 {
 						continue
 					}
 					listStr := strings.Join(lableContentVal, ";")
 					//resultStr = resultStr + "\"" + secValStr + "\"" + ":" + "\"" + listStr + "\"" + ","
-					resultStr = resultStr + "," + secValStr + ":" + listStr
+					resultStr = resultStr + "$$$" + secValStr + ":" + listStr
 
 				case []interface{}:
 					var labelContent = ""
@@ -349,12 +383,12 @@ func (o OrderLogic) MakeDisplayContent(lableM map[string]map[string]string, cont
 						ipVal := oneObjVal["ip"]
 						labelContent = labelContent + ";" + ipVal.(string)
 					}
-					resultStr = resultStr + "," + secValStr + ":" + strings.Trim(labelContent, ";")
+					resultStr = resultStr + "$$$" + secValStr + ":" + strings.Trim(labelContent, ";")
 				}
 			}
 		}
 	}
-	return strings.Trim(resultStr, ",")
+	return strings.Trim(resultStr, "$$$")
 }
 
 func (o OrderLogic) SubmitItsmWorkflow(taskID, operateCode string) (string, bool) {
