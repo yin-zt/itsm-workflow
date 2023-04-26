@@ -26,6 +26,7 @@ var DB *gorm.DB
 
 // 初始化mysql数据库
 func InitMysql() {
+	defer log.Flush()
 	var (
 		resp any
 	)
@@ -78,6 +79,7 @@ func InitMysql() {
 // 自动迁移表结构
 func dbAutoMigrate() {
 	_ = DB.AutoMigrate(
-		&order.Order{},
+		&order.T_Order{},
+		//&order.Big_T_Order{},
 	)
 }

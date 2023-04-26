@@ -14,6 +14,7 @@ import (
 	"github.com/yin-zt/itsm-workflow/pkg/utils/tools"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type OrderLogic struct{}
@@ -33,14 +34,14 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 		return nil, ReqAssertErr
 	}
 	_ = c
-	filter := tools.H{"apply_logic_id": r.LogicId}
+	filter := tools.H{"F_apply_logic_id": r.LogicId}
 
 	if !isql.Order.Exist(filter) {
 		OpeLoger.Errorf("工单信息不存在，工单ID为：%v", r.LogicId)
 		return nil, tools.NewMySqlError(fmt.Errorf("工单信息不存在"))
 	}
 
-	oneOrder := new(order.Order)
+	oneOrder := new(order.T_Order)
 	err := isql.Order.Find(filter, oneOrder)
 	if err != nil {
 		OpeLoger.Error("获取工单详细信息失败: %s", err.Error())
@@ -48,10 +49,10 @@ func (o OrderLogic) GetOrderInfo(c *gin.Context, req interface{}) (data interfac
 	}
 	//displayStr := oneOrder.DisplayContent
 
-	disPlayContent := strings.Split(oneOrder.DisplayContent, "$$$")
+	disPlayContent := strings.Split(oneOrder.FDisplayContent, "$$$")
 
 	responseItem := response.OneOrderInfo{
-		Title:    oneOrder.ApplyType,
+		Title:    oneOrder.FApplyType,
 		Type:     "default",
 		Item:     disPlayContent,
 		IsExpand: true,
@@ -100,7 +101,7 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	orderName := r.ProcessInstance.Name
 	orderId := fmt.Sprintf("%s_%s", instanceId, taskId)
 	formData := r.FormData
-	if isql.Order.Exist(tools.H{"apply_logic_id": orderId}) {
+	if isql.Order.Exist(tools.H{"F_apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
 	approvalFlow := o.FindOutWorkflow(r.UserTaskList)
@@ -110,28 +111,44 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 
 	dispalyContent := o.MakeDisplayContent(labelKeyMap, labelValMap)
 
-	order := order.Order{
-		ApplyLogicId:   orderId,
-		InstanceId:     instanceId,
-		TaskId:         taskId,
-		ApplyUser:      creator,
-		ApplyType:      config.ItsmType,
-		OrderName:      orderName,
-		ApplyStatus:    0,
-		ExecuteStatus:  0,
-		DisplayContent: dispalyContent,
-		ApprovalUser:   approvalFlow,
+	orderinfo := order.T_Order{
+		FCreatedAt:      time.Now(),
+		FUpdatedAt:      time.Now(),
+		FApplyLogicId:   orderId,
+		FInstanceId:     instanceId,
+		FTaskId:         taskId,
+		FApplyUser:      creator,
+		FApplyType:      config.ItsmType,
+		FOrderName:      orderName,
+		FApplyStatus:    0,
+		FExecuteStatus:  0,
+		FDisplayContent: dispalyContent,
+		FApprovalUser:   approvalFlow,
 	}
 
 	// 然后在数据库中创建组
-	err := isql.Order.Add(&order)
+	err := isql.Order.Add(&orderinfo)
 	if err != nil {
 		OpeLoger.Infof("向MySQL创建工单失败, 报错信息为：%v", err)
 		return nil, tools.NewMySqlError(fmt.Errorf("向MySQL创建工单失败"))
 	}
 
 	// OriginApproval(logicId, orderName, userinfos, creator string)
-	Oa.OriginApproval(orderId, orderName, approvalFlow, creator)
+	ananlyRes := Oa.OriginApproval(orderId, orderName, approvalFlow, creator)
+	if ananlyRes != nil {
+		submitOrder := order.T_Order{
+			FApplyLogicId: orderId,
+			FApplyStatus:  1,
+			FUpdatedAt:    time.Now(),
+		}
+		err := isql.Order.Update(&submitOrder)
+		if err != nil {
+			OpeLoger.Infof("向MySQL更新工单失败, 报错信息为：%v", err)
+			return nil, tools.NewMySqlError(fmt.Errorf("向MySQL更新工单失败"))
+		}
+	} else {
+		OpeLoger.Error("调用OriginApproval接口异常")
+	}
 	return nil, nil
 }
 
@@ -155,15 +172,15 @@ func (o OrderLogic) OaCallBack(c *gin.Context, req interface{}) (data interface{
 	if err != nil {
 		OpeLoger.Errorf("code 竟然不是整数, %v", c.PostForm("code"))
 	}
-	filter := tools.H{"apply_logic_id": orderLogicId}
+	filter := tools.H{"F_apply_logic_id": orderLogicId}
 	if !isql.Order.Exist(filter) {
 		OpeLoger.Errorf("工单不存在，工单id为：%v", r.LogicId)
 		return nil, tools.NewValidatorError(fmt.Errorf("工单不存在, 工单id为:%v", orderLogicId))
 	}
 
-	updateOrderInfo := order.Order{
-		ApplyLogicId:  orderLogicId,
-		ExecuteStatus: uint(orderCode),
+	updateOrderInfo := order.T_Order{
+		FApplyLogicId:  orderLogicId,
+		FExecuteStatus: uint(orderCode),
 	}
 	err = isql.Order.Update(&updateOrderInfo)
 	if err != nil {
@@ -172,10 +189,10 @@ func (o OrderLogic) OaCallBack(c *gin.Context, req interface{}) (data interface{
 	}
 	callItsmRes, opeflag := o.SubmitItsmWorkflow(orderLogicId, orderFormCode)
 	if opeflag {
-		updateItsmInfo := order.Order{
-			ApplyLogicId:  orderLogicId,
-			ItsmOperation: 1,
-			ItsmResult:    callItsmRes,
+		updateItsmInfo := order.T_Order{
+			FApplyLogicId:  orderLogicId,
+			FItsmOperation: 1,
+			FItsmResult:    callItsmRes,
 		}
 		err = isql.Order.Update(&updateItsmInfo)
 		if err != nil {
@@ -185,10 +202,10 @@ func (o OrderLogic) OaCallBack(c *gin.Context, req interface{}) (data interface{
 			OpeLoger.Info("调用itsm自动审批接口正常，成功更新工单信息")
 		}
 	} else {
-		updateItsmInfo := order.Order{
-			ApplyLogicId:  orderLogicId,
-			ItsmOperation: 2,
-			ItsmResult:    callItsmRes,
+		updateItsmInfo := order.T_Order{
+			FApplyLogicId:  orderLogicId,
+			FItsmOperation: 2,
+			FItsmResult:    callItsmRes,
 		}
 		err = isql.Order.Update(&updateItsmInfo)
 		if err != nil {
