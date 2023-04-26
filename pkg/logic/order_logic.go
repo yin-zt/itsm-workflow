@@ -78,6 +78,7 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		taskId      string
 		instanceId  string
 		creator     string
+		optionVal   string
 		labelKeyMap = make(map[string]map[string]string)
 		labelValMap = make(map[string][]map[string]interface{})
 	)
@@ -86,11 +87,49 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		return nil, ReqAssertErr
 	}
 	stepLists := r.StepList
-	for _, item := range stepLists {
-		if item.Status == "running" {
-			taskId = item.InstanceId
-		}
-	}
+	//for _, item := range stepLists {
+	//	if item.Status == "running" {
+	//		taskId = item.InstanceId
+	//	} else {
+	//		formData := item.FormData
+	//		var formDataLists []map[string]interface{}
+	//		err := json.Unmarshal([]byte(formData), &formDataLists)
+	//		if err != nil {
+	//			OpeLoger.Errorf("StepList.FormDefinition字符串内容失败，错误：%s", err)
+	//			continue
+	//		}
+	//		for _, oneFormData := range formDataLists {
+	//			oneFormVal := oneFormData["values"]
+	//			oneFormValLists, ok := oneFormVal.([]interface{})
+	//			if !ok{
+	//				OpeLoger.Errorf("oneFormVal竟然不是列表，值为: %v", oneFormVal)
+	//				continue
+	//			}
+	//			for _, oneItem := range oneFormValLists{
+	//				oneItemMap, ok := oneItem.(map[string]interface{})
+	//				if !ok{
+	//					OpeLoger.Errorf("oneItem竟然不是字典结构，值为:%v", oneItem)
+	//				}
+	//				oneValue,ok := oneItemMap["approval_flow"]
+	//				if !ok{
+	//					continue
+	//				}
+	//				oneValueMap, ok := oneValue.(map[string]interface{})
+	//				if !ok{
+	//					OpeLoger.Errorf("oneValue的值非字典结构，值为:%v",oneValue)
+	//					continue
+	//				}
+	//				oneValueFinal, ok := oneValueMap["value"]
+	//				if !ok{
+	//					optionVal = ""
+	//				}else{
+	//					optionVal = oneValueFinal.(string)
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
+	taskId, optionVal = o.AnalyStepList(stepLists)
 
 	if r.ProcessInstance.Status != "running" {
 		log.Errorf("此工单状态为非流转,工单ID:%s, 任务ID:%s", instanceId, taskId)
@@ -104,9 +143,8 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	if isql.Order.Exist(tools.H{"F_apply_logic_id": orderId}) {
 		return nil, tools.NewValidatorError(fmt.Errorf("工单已存在,请勿重复添加"))
 	}
-	approvalFlow := o.FindOutWorkflow(r.UserTaskList)
-	fmt.Println(approvalFlow)
-	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap)
+	approvalFlow, rongQiKey := o.FindOutWorkflow(r.UserTaskList, optionVal)
+	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap, rongQiKey)
 	o.FindOutLabelVals(formData, labelValMap)
 
 	dispalyContent := o.MakeDisplayContent(labelKeyMap, labelValMap)
@@ -220,7 +258,14 @@ func (o OrderLogic) OaCallBack(c *gin.Context, req interface{}) (data interface{
 }
 
 // FindOutWorkflow 作用是解析itsm流程中首节点的内容，找出相应的审批流
-func (o OrderLogic) FindOutWorkflow(tasks []request.UserTask) string {
+func (o OrderLogic) FindOutWorkflow(tasks []request.UserTask, doneOption string) (string, string) {
+	var (
+		approvalOptions = make(map[string]string)
+		approvalTitle   = []string{}
+		rongQiKey       = ""
+	)
+	fmt.Println(doneOption)
+	fmt.Println("lllllllllllllllllllllll")
 	for _, task := range tasks {
 		if task.FormDefinition == "" {
 			continue
@@ -229,7 +274,7 @@ func (o OrderLogic) FindOutWorkflow(tasks []request.UserTask) string {
 		err := json.Unmarshal([]byte(task.FormDefinition), &m2)
 		if err != nil {
 			log.Errorf("解析task.FormDefinition字符串内容失败，错误：%s", err)
-			return ""
+			return "", rongQiKey
 		}
 		if len(m2) == 0 {
 			continue
@@ -238,37 +283,101 @@ func (o OrderLogic) FindOutWorkflow(tasks []request.UserTask) string {
 		for _, innerMap := range m2 {
 			fmt.Println(innerMap["name"])
 			fmt.Println(innerMap["displayCondition"])
-			if innerMap["displayCondition"] == nil {
-				fmt.Println(innerMap["displayCondition"])
-				continue
-			}
 			if propertys, ok := innerMap["propertys"]; ok {
 				if propertysLists, ok := propertys.([]interface{}); ok {
 					for _, oneProperty := range propertysLists {
 						oneData, ok := oneProperty.(map[string]interface{})
 						if !ok {
-							OpeLoger.Error("property列表中元素竟然不是字典")
+							OpeLoger.Error("工单中userTaskList数据块中formDefinition中property列表中元素竟然不是字典")
 						}
-						modelField := oneData["modelField"]
+						modelField, ok := oneData["modelField"]
+						if !ok {
+							OpeLoger.Errorf("oneData这个字典中竟然没有modelField键，值为:%v", oneData)
+							continue
+						}
+						typeField, ok := oneData["type"]
+						if !ok {
+							OpeLoger.Errorf("oneData这个字典中竟然没有type键，值为:%v", oneData)
+							continue
+						}
+						typeVal, ok := typeField.(string)
+						if !ok {
+							OpeLoger.Error("typeField竟然不是字符串")
+							continue
+						}
 						modelFieldStr, ok := modelField.(string)
 						if !ok {
 							OpeLoger.Error("modelField不是字符串")
-							return ""
+							return "", rongQiKey
 						}
 						if modelFieldStr == "approval_flow" {
+							rongQiKey = innerMap["key"].(string)
+							if typeVal == "INPUT" {
+								options := oneData["options"]
+								optionsMap, ok := options.(map[string]interface{})
+								if !ok {
+									OpeLoger.Error("options 竟然不是字典")
+									continue
+								}
+								defaultVal, ok := optionsMap["defaultValue"]
+								if ok {
+									return defaultVal.(string), rongQiKey
+								} else {
+									return "", rongQiKey
+								}
+							} else if typeVal == "SELECT" {
+								options := oneData["options"]
+								optionsMap, ok := options.(map[string]interface{})
+								if !ok {
+									OpeLoger.Error("options 竟然不是字典")
+									continue
+								}
+								extraProps, ok := optionsMap["extraProps"]
+								if !ok {
+									OpeLoger.Errorf("item的值竟然为空，值为:%v", optionsMap)
+									continue
+								}
+								extraPropsItem, ok := extraProps.(map[string]interface{})
+								if !ok {
+									OpeLoger.Errorf("extraProps的值竟然不是字典结构，值为: %v", extraProps)
+									continue
+								}
+								itemsFields, ok := extraPropsItem["items"]
+								if !ok {
+									OpeLoger.Errorf("extraPropsItem字典中不存在key为:items的值, %v", extraPropsItem)
+									continue
+								}
+								itemsLists, ok := itemsFields.([]interface{})
+								if !ok {
+									OpeLoger.Errorf("item的值竟然不是列表，值为:%v", itemsFields)
+									continue
+								}
+								for _, item := range itemsLists {
+									smallItemMap, ok := item.(map[string]interface{})
+									if !ok {
+										OpeLoger.Errorf("item竟然不是字典结构，值为: %v", item)
+										continue
+									}
+									approvalTitle = append(approvalTitle, smallItemMap["value"].(string))
+								}
+							}
+						} else {
 							options := oneData["options"]
 							optionsMap, ok := options.(map[string]interface{})
 							if !ok {
-								OpeLoger.Error("options 竟然不是字典")
+								OpeLoger.Errorf("options 竟然不是字典, 值为: %v", options)
 								continue
 							}
 							defaultVal, ok := optionsMap["defaultValue"]
-							if ok {
-								return defaultVal.(string)
-							} else {
-								return ""
+							defaultStrVal, ok := defaultVal.(string)
+							if !ok {
+								OpeLoger.Errorf("defaultStrVal is not string,with value: %v", defaultVal)
+								continue
 							}
-
+							if defaultStrVal == "" {
+								continue
+							}
+							approvalOptions[modelFieldStr] = defaultVal.(string)
 						}
 					}
 				} else {
@@ -277,12 +386,20 @@ func (o OrderLogic) FindOutWorkflow(tasks []request.UserTask) string {
 			}
 		}
 	}
-	return ""
+	fmt.Println(approvalOptions)
+	fmt.Println("lmlml")
+	finalKey := fmt.Sprintf("%s_%s", "approval_flow", doneOption)
+	finalVal, ok := approvalOptions[finalKey]
+	if !ok {
+		OpeLoger.Errorf("工单审批人为空")
+		return "", rongQiKey
+	}
+	return finalVal, rongQiKey
 }
 
 // FindOutLabelKeys 作用是解析工单任务中字段名称与字段id的关联关系，并以字典的形式返回。
 // 字典最外层的key是容器的id，里面的字典key为字段id，值为 字段的中文名
-func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string]map[string]string) {
+func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string]map[string]string, rongQi string) {
 	for _, task := range tasks {
 		if task.FormDefinition == "" {
 			continue
@@ -302,6 +419,9 @@ func (o OrderLogic) FindOutLabelKeys(tasks []request.UserTask, retMap map[string
 			var bigMap = map[string]string{}
 			if labelName, ok := innerMap["key"]; ok {
 				mapKey = labelName.(string)
+				if mapKey == rongQi {
+					continue
+				}
 				retMap[mapKey] = map[string]string{}
 			} else {
 				continue
@@ -427,4 +547,55 @@ func (o OrderLogic) SubmitItsmWorkflow(taskID, operateCode string) (string, bool
 		OpeLoger.Errorf("operateCode 的值不是20或者60，而是错误的数值：%v", operateCode)
 		return "", false
 	}
+}
+
+// AnalyStepList 用于分析工单信息中stepLists内容，找出目标字段填写内容，及正在审批的节点taskID
+func (o OrderLogic) AnalyStepList(stepLists []request.StepList) (string, string) {
+	var (
+		taskId, optionVal string
+	)
+
+	for _, item := range stepLists {
+		if item.Status == "running" {
+			taskId = item.InstanceId
+		} else {
+			formData := item.FormData
+			var formDataLists []map[string]interface{}
+			err := json.Unmarshal([]byte(formData), &formDataLists)
+			if err != nil {
+				OpeLoger.Errorf("StepList.FormDefinition字符串内容失败，错误：%s", err)
+				continue
+			}
+			for _, oneFormData := range formDataLists {
+				oneFormVal := oneFormData["values"]
+				oneFormValLists, ok := oneFormVal.([]interface{})
+				if !ok {
+					OpeLoger.Errorf("oneFormVal竟然不是列表，值为: %v", oneFormVal)
+					continue
+				}
+				for _, oneItem := range oneFormValLists {
+					oneItemMap, ok := oneItem.(map[string]interface{})
+					if !ok {
+						OpeLoger.Errorf("oneItem竟然不是字典结构，值为:%v", oneItem)
+					}
+					oneValue, ok := oneItemMap["approval_flow"]
+					if !ok {
+						continue
+					}
+					oneValueMap, ok := oneValue.(map[string]interface{})
+					if !ok {
+						OpeLoger.Errorf("oneValue的值非字典结构，值为:%v", oneValue)
+						continue
+					}
+					oneValueFinal, ok := oneValueMap["value"]
+					if !ok {
+						optionVal = ""
+					} else {
+						optionVal = oneValueFinal.(string)
+					}
+				}
+			}
+		}
+	}
+	return taskId, optionVal
 }

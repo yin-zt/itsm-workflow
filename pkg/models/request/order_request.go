@@ -47,6 +47,7 @@ type UserTaskInfo struct {
 type StepList struct {
 	InstanceId string `json:"instanceId"`
 	Status     string `json:"status"`
+	FormData   string `json:"formData"`
 	//FormData   string `json:"formData"`
 }
 
