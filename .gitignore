@@ -4,3 +4,4 @@ oa_func.go
 a_oa.go
 api.go
 itsm.go
+cmdb_config.go

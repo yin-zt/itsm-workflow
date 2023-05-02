@@ -9,8 +9,8 @@ import (
 func InitCmdbRoutes(r *gin.RouterGroup) gin.IRoutes {
 	order := r.Group("/cmdb5")
 	{
-		order.POST("/get_user_resources", controllers.Cmdb.GetUserResources)
-		//order.POST("/collect", controllers.Order.CollectOrderInfo)
+		order.POST("/get_user_all_resources", controllers.Cmdb.GetUserAllResources)
+		//order.POST("/get_model_objects", controllers.Cmdb.GetUserModels)
 		//order.POST("/callback", controllers.Order.OaCallBack)
 		//order.POST("/add", controllers.Order.AddOrder)
 	}

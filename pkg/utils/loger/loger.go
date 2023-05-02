@@ -32,3 +32,13 @@ func GetLoggerOperate() log.LoggerInterface {
 	LoggerOpe = logger
 	return LoggerOpe
 }
+
+func GetCmdbLogger() log.LoggerInterface {
+	os.MkdirAll("/var/loger/", 0777)
+	logger, err := log.LoggerFromConfigAsBytes([]byte(config.LogOperateCmdbStr))
+	if err != nil {
+		log.Error("init cmdb loger fail")
+		os.Exit(1)
+	}
+	return logger
+}

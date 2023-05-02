@@ -87,48 +87,6 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 		return nil, ReqAssertErr
 	}
 	stepLists := r.StepList
-	//for _, item := range stepLists {
-	//	if item.Status == "running" {
-	//		taskId = item.InstanceId
-	//	} else {
-	//		formData := item.FormData
-	//		var formDataLists []map[string]interface{}
-	//		err := json.Unmarshal([]byte(formData), &formDataLists)
-	//		if err != nil {
-	//			OpeLoger.Errorf("StepList.FormDefinition字符串内容失败，错误：%s", err)
-	//			continue
-	//		}
-	//		for _, oneFormData := range formDataLists {
-	//			oneFormVal := oneFormData["values"]
-	//			oneFormValLists, ok := oneFormVal.([]interface{})
-	//			if !ok{
-	//				OpeLoger.Errorf("oneFormVal竟然不是列表，值为: %v", oneFormVal)
-	//				continue
-	//			}
-	//			for _, oneItem := range oneFormValLists{
-	//				oneItemMap, ok := oneItem.(map[string]interface{})
-	//				if !ok{
-	//					OpeLoger.Errorf("oneItem竟然不是字典结构，值为:%v", oneItem)
-	//				}
-	//				oneValue,ok := oneItemMap["approval_flow"]
-	//				if !ok{
-	//					continue
-	//				}
-	//				oneValueMap, ok := oneValue.(map[string]interface{})
-	//				if !ok{
-	//					OpeLoger.Errorf("oneValue的值非字典结构，值为:%v",oneValue)
-	//					continue
-	//				}
-	//				oneValueFinal, ok := oneValueMap["value"]
-	//				if !ok{
-	//					optionVal = ""
-	//				}else{
-	//					optionVal = oneValueFinal.(string)
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
 	taskId, optionVal = o.AnalyStepList(stepLists)
 
 	if r.ProcessInstance.Status != "running" {
@@ -147,6 +105,10 @@ func (o OrderLogic) AnalyOrderInfo(c *gin.Context, req interface{}) (data interf
 	o.FindOutLabelKeys(r.UserTaskList, labelKeyMap, rongQiKey)
 	o.FindOutLabelVals(formData, labelValMap)
 
+	fmt.Println(labelKeyMap)
+	fmt.Println(labelValMap)
+	OpeLoger.Infof("整理工单lable字典内容为：%v", labelKeyMap)
+	OpeLoger.Infof("整理工单lable-value字典内容为：%v", labelValMap)
 	dispalyContent := o.MakeDisplayContent(labelKeyMap, labelValMap)
 
 	orderinfo := order.T_Order{

@@ -10,7 +10,7 @@ type T_Order struct {
 	FCreatedAt      time.Time `gorm:"column:F_created_at" json:"F_created_at"`
 	FUpdatedAt      time.Time `gorm:"column:F_updated_at" json:"F_updated_at"`
 	FDeletedAt      time.Time `gorm:"column:F_deleted_at" json:"F_deleted_at"`
-	FApplyLogicId   string    `gorm:"type:varchar(128);comment:'申请ID';column:F_apply_logic_id" json:"F_apply_logic_id"`
+	FApplyLogicId   string    `gorm:"type:varchar(128);comment:'申请ID';column:F_apply_logic_id;index" json:"F_apply_logic_id"`
 	FTaskId         string    `gorm:"type:varchar(128);comment:'任务ID';column:F_task_id" json:"F_task_id"`
 	FInstanceId     string    `gorm:"type:varchar(128);comment:'节点ID';column:F_instance_id" json:"F_instance_id"`
 	FApplyUser      string    `gorm:"type:varchar(128);comment:'申请用户';column:F_apply_user" json:"F_apply_user"`
